@@ -1,9 +1,9 @@
 // ==================== 設定區 ====================
 // ⚠️ 請在下面這行填入你的 Apps Script Web App URL
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby9rRmjF9qKoUrqKMfgKQ5IP_fCL-sLT_12O8p5bDT469Nx-4wFN5or5Vr5PIDuRRGt8Q/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyfp1Tj9qlNlxjujJbkDMJoP5D5fvrodAfmz4MnPkPBcfmjK7B9oMyFtK1ZBObeV4cx3g/exec';
 
 // 例如：
-// const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby9rRmjF9qKoUrqKMfgKQ5IP_fCL-sLT_12O8p5bDT469Nx-4wFN5or5Vr5PIDuRRGt8Q/exec';
+// const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyfp1Tj9qlNlxjujJbkDMJoP5D5fvrodAfmz4MnPkPBcfmjK7B9oMyFtK1ZBObeV4cx3g/exec';
 
 // GitHub Pages 網址（用於 CORS 驗證）
 const FRONTEND_URL = 'https://tom26757207.github.io/shifeng-leave-system';
