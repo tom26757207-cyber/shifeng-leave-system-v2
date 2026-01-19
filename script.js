@@ -1,6 +1,6 @@
 // ==================== 設定區 ====================
 // ⚠️ 請在下面這行填入你的 Apps Script Web App URL
-const APPS_SCRIPT_URL = '在這裡貼上你的網址';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby9rRmjF9qKoUrqKMfgKQ5IP_fCL-sLT_12O8p5bDT469Nx-4wFN5or5Vr5PIDuRRGt8Q/exec';
 
 // 例如：
 // const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby9rRmjF9qKoUrqKMfgKQ5IP_fCL-sLT_12O8p5bDT469Nx-4wFN5or5Vr5PIDuRRGt8Q/exec';
