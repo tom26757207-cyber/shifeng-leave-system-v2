@@ -1,287 +1,410 @@
-// Apps Script 網址（請在部署後填入）
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzZmKfzEDwB87tcWffoOLkKYINSRV4LFeHtZJ-Y4cGO-JKyx-p5viZGVVSdX059QXzMUA/exec';
+// ==================== 配置區 ====================
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTprRfjKVti8N1NRmX4317mK-zz3Lue0dmlEhISfyY_o9c1AH4WWhdvKvgM009INGfQQ/exec';
 
-// 全域變數
-let employeesData = [];
-let leaveTypesData = [];
+// ==================== 全域變數 ====================
+let employeeData = []; // 員工資料
+let currentMode = 'continuous'; // 當前請假模式
+let isConnected = false; // 連線狀態
 
-// 頁面載入時初始化
+// ==================== 初始化 ====================
 document.addEventListener('DOMContentLoaded', function() {
-    loadEmployees();
-    loadLeaveTypes();
-    setupAutocomplete();
-    setupDateCalculation();
-    setupTimeModeToggle();
+    initializeApp();
 });
 
-// ========================================
-// 時間模式切換
-// ========================================
-function setupTimeModeToggle() {
-    const timeModeSelect = document.getElementById('time_mode');
-    const dateMode = document.getElementById('dateMode');
-    const timeMode = document.getElementById('timeMode');
+function initializeApp() {
+    // 檢查連線狀態
+    checkConnection();
     
-    const startDate = document.getElementById('start_date');
-    const endDate = document.getElementById('end_date');
-    const leaveDate = document.getElementById('leave_date');
-    const startTime = document.getElementById('start_time');
-    const endTime = document.getElementById('end_time');
+    // 載入員工資料
+    loadEmployeeData();
+    
+    // 初始化事件監聽
+    initializeEventListeners();
+    
+    // 初始化日期
+    initializeDates();
+    
+    // 初始化字數計數
+    initializeCharCounters();
+}
 
-    timeModeSelect.addEventListener('change', function() {
-        if (this.value === 'time') {
-            // 切換到時間模式
-            dateMode.style.display = 'none';
-            timeMode.classList.add('active');
-            
-            startDate.removeAttribute('required');
-            endDate.removeAttribute('required');
-            leaveDate.setAttribute('required', 'required');
-            startTime.setAttribute('required', 'required');
-            endTime.setAttribute('required', 'required');
+// ==================== 檢查連線狀態 ====================
+async function checkConnection() {
+    const statusElement = document.getElementById('connectionStatus');
+    const statusText = statusElement.querySelector('.status-text');
+    
+    try {
+        // 測試連線到 Google Sheets
+        const response = await fetch(`${SCRIPT_URL}?action=ping`, {
+            method: 'GET',
+            cache: 'no-cache'
+        });
+        
+        if (response.ok) {
+            isConnected = true;
+            statusElement.classList.add('connected');
+            statusElement.classList.remove('disconnected');
+            statusText.textContent = '已連線到 Google Sheets';
+            console.log('✅ 成功連線到 Google Sheets');
         } else {
-            // 切換到日期模式
-            dateMode.style.display = 'grid';
-            timeMode.classList.remove('active');
-            
-            startDate.setAttribute('required', 'required');
-            endDate.setAttribute('required', 'required');
-            leaveDate.removeAttribute('required');
-            startTime.removeAttribute('required');
-            endTime.removeAttribute('required');
+            throw new Error('連線失敗');
         }
-        
-        // 重新計算天數/時數
-        calculateDaysAndHours();
-    });
-
-    // 時間改變時自動計算時數
-    startTime.addEventListener('change', calculateDaysAndHours);
-    endTime.addEventListener('change', calculateDaysAndHours);
-    leaveDate.addEventListener('change', calculateDaysAndHours);
-}
-
-// ========================================
-// 載入員工資料
-// ========================================
-async function loadEmployees() {
-    try {
-        const response = await fetch(`${APPS_SCRIPT_URL}?action=getEmployees`);
-        employeesData = await response.json();
     } catch (error) {
-        console.error('載入員工資料失敗：', error);
-        alert('⚠️ 載入員工資料失敗，請重新整理頁面');
+        isConnected = false;
+        statusElement.classList.add('disconnected');
+        statusElement.classList.remove('connected');
+        statusText.textContent = '無法連線到 Google Sheets';
+        console.error('❌ 連線失敗:', error);
     }
 }
 
-// ========================================
-// 載入請假類別
-// ========================================
-async function loadLeaveTypes() {
+// ==================== 載入員工資料 ====================
+async function loadEmployeeData() {
     try {
-        const response = await fetch(`${APPS_SCRIPT_URL}?action=getLeaveTypes`);
-        leaveTypesData = await response.json();
-        
-        const select = document.getElementById('leave_type');
-        leaveTypesData.forEach(type => {
-            const option = document.createElement('option');
-            option.value = type.type_name;
-            option.textContent = type.type_name;
-            select.appendChild(option);
+        console.log('🔄 開始載入員工資料...');
+        const response = await fetch(`${SCRIPT_URL}?action=getEmployees`, {
+            method: 'GET',
+            cache: 'no-cache'
         });
-    } catch (error) {
-        console.error('載入請假類別失敗：', error);
-    }
-}
-
-// ========================================
-// 設定自動完成功能
-// ========================================
-function setupAutocomplete() {
-    const input = document.getElementById('emp_name');
-    const list = document.getElementById('autocompleteList');
-    const empIdInput = document.getElementById('emp_id');
-
-    input.addEventListener('input', function() {
-        const value = this.value.trim().toLowerCase();
         
-        if (value === '') {
-            list.classList.remove('active');
-            empIdInput.value = '';
-            return;
-        }
-
-        // 過濾員工
-        const filtered = employeesData.filter(emp => 
-            emp.emp_name.toLowerCase().includes(value) || 
-            emp.emp_id.toLowerCase().includes(value)
-        );
-
-        if (filtered.length === 0) {
-            list.innerHTML = '<div class="autocomplete-item" style="color: #999;">查無符合的員工</div>';
-            list.classList.add('active');
-            empIdInput.value = '';
-            return;
-        }
-
-        // 顯示結果
-        list.innerHTML = filtered.map(emp => `
-            <div class="autocomplete-item" data-emp-id="${emp.emp_id}" data-emp-name="${emp.emp_name}">
-                <div class="emp-name">${emp.emp_name}</div>
-                <div class="emp-id">${emp.emp_id}</div>
-            </div>
-        `).join('');
-
-        list.classList.add('active');
-
-        // 綁定點擊事件
-        list.querySelectorAll('.autocomplete-item').forEach(item => {
-            item.addEventListener('click', function() {
-                const empId = this.getAttribute('data-emp-id');
-                const empName = this.getAttribute('data-emp-name');
-                
-                if (empId && empName) {
-                    input.value = empName;
-                    empIdInput.value = empId;
-                    list.classList.remove('active');
-                }
-            });
-        });
-    });
-
-    // 點擊外部關閉列表
-    document.addEventListener('click', function(e) {
-        if (!input.contains(e.target) && !list.contains(e.target)) {
-            list.classList.remove('active');
-        }
-    });
-}
-
-// ========================================
-// 自動計算天數與時數
-// ========================================
-function setupDateCalculation() {
-    const startDate = document.getElementById('start_date');
-    const endDate = document.getElementById('end_date');
-
-    startDate.addEventListener('change', calculateDaysAndHours);
-    endDate.addEventListener('change', calculateDaysAndHours);
-}
-
-function calculateDaysAndHours() {
-    const timeMode = document.getElementById('time_mode').value;
-    const daysInput = document.getElementById('days');
-    const hoursInput = document.getElementById('hours');
-
-    if (timeMode === 'date') {
-        // 日期模式：計算天數
-        const startDate = document.getElementById('start_date').value;
-        const endDate = document.getElementById('end_date').value;
-
-        if (startDate && endDate) {
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-            const diffTime = Math.abs(end - start);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
-            daysInput.value = diffDays;
-            hoursInput.value = diffDays * 8;
-        }
-    } else {
-        // 時間模式：計算時數
-        const startTime = document.getElementById('start_time').value;
-        const endTime = document.getElementById('end_time').value;
-
-        if (startTime && endTime) {
-            const start = new Date(`2000-01-01T${startTime}`);
-            const end = new Date(`2000-01-01T${endTime}`);
+        if (response.ok) {
+            const text = await response.text();
+            console.log('📥 收到回應:', text);
             
-            let diffMs = end - start;
-            if (diffMs < 0) {
-                // 跨日
-                diffMs += 24 * 60 * 60 * 1000;
+            try {
+                employeeData = JSON.parse(text);
+                console.log('✅ 員工資料載入成功:', employeeData.length, '筆');
+                console.log('📋 員工資料:', employeeData);
+            } catch (parseError) {
+                console.error('❌ JSON 解析失敗:', parseError);
+                console.log('收到的內容:', text);
+                employeeData = [];
             }
-            
-            const diffHours = diffMs / (1000 * 60 * 60);
-            const diffDays = diffHours / 8;
-
-            hoursInput.value = diffHours.toFixed(1);
-            daysInput.value = diffDays.toFixed(2);
+        } else {
+            throw new Error('HTTP ' + response.status);
         }
+    } catch (error) {
+        console.error('❌ 員工資料載入失敗:', error);
+        employeeData = [];
     }
 }
 
-// ========================================
-// 表單提交
-// ========================================
-document.getElementById('leaveForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
+// ==================== 事件監聽初始化 ====================
+function initializeEventListeners() {
+    // 模式切換
+    const modeButtons = document.querySelectorAll('.mode-btn');
+    modeButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            switchMode(this.dataset.mode);
+        });
+    });
+    
+    // 員工姓名自動完成
+    const employeeNameInput = document.getElementById('employeeName');
+    employeeNameInput.addEventListener('input', handleEmployeeNameInput);
+    employeeNameInput.addEventListener('focus', handleEmployeeNameInput);
+    employeeNameInput.addEventListener('blur', () => {
+        setTimeout(() => {
+            hideAutocomplete();
+        }, 200);
+    });
+    
+    // 表單送出
+    const form = document.getElementById('leaveForm');
+    form.addEventListener('submit', handleFormSubmit);
+}
 
-    // 驗證員工編號
-    const empId = document.getElementById('emp_id').value;
-    const empName = document.getElementById('emp_name').value;
+// ==================== 日期初始化 ====================
+function initializeDates() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('startDate').value = today;
+    document.getElementById('endDate').value = today;
+    document.getElementById('singleDate').value = today;
+}
 
-    if (!empId) {
-        alert('⚠️ 請從下拉選單選擇員工姓名');
+// ==================== 字數計數器 ====================
+function initializeCharCounters() {
+    const counters = [
+        { input: 'reason', counter: 'reasonCount' },
+        { input: 'affectedCases', counter: 'affectedCount' },
+        { input: 'remarks', counter: 'remarksCount' }
+    ];
+    
+    counters.forEach(({ input, counter }) => {
+        const inputElement = document.getElementById(input);
+        const counterElement = document.getElementById(counter);
+        
+        inputElement.addEventListener('input', function() {
+            counterElement.textContent = this.value.length;
+        });
+    });
+}
+
+// ==================== 模式切換 ====================
+function switchMode(mode) {
+    currentMode = mode;
+    
+    // 更新按鈕狀態
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.mode === mode) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // 切換顯示的模式
+    const continuousMode = document.getElementById('continuousMode');
+    const singleMode = document.getElementById('singleMode');
+    
+    if (mode === 'continuous') {
+        continuousMode.classList.remove('hidden');
+        singleMode.classList.add('hidden');
+    } else {
+        continuousMode.classList.add('hidden');
+        singleMode.classList.remove('hidden');
+    }
+}
+
+// ==================== 員工姓名自動完成 ====================
+function handleEmployeeNameInput(e) {
+    const input = e.target.value.trim();
+    const dropdown = document.getElementById('autocompleteDropdown');
+    
+    console.log('🔍 搜尋員工:', input);
+    console.log('📊 員工資料總數:', employeeData.length);
+    
+    if (!input) {
+        hideAutocomplete();
         return;
     }
-
-    // 顯示 Loading
-    document.getElementById('loadingOverlay').classList.add('active');
-
-    // 收集表單資料
-    const timeMode = document.getElementById('time_mode').value;
-    let startDate, endDate;
-
-    if (timeMode === 'date') {
-        startDate = document.getElementById('start_date').value;
-        endDate = document.getElementById('end_date').value;
-    } else {
-        const leaveDate = document.getElementById('leave_date').value;
-        const startTime = document.getElementById('start_time').value;
-        const endTime = document.getElementById('end_time').value;
-        
-        startDate = `${leaveDate} ${startTime}`;
-        endDate = `${leaveDate} ${endTime}`;
+    
+    if (employeeData.length === 0) {
+        console.log('⚠️ 無員工資料，無法顯示自動完成');
+        hideAutocomplete();
+        return;
     }
+    
+    // 過濾符合的員工（模糊搜尋）
+    const filtered = employeeData.filter(emp => {
+        const nameMatch = emp.name && emp.name.includes(input);
+        const idMatch = emp.id && emp.id.includes(input);
+        return nameMatch || idMatch;
+    });
+    
+    console.log('🎯 找到', filtered.length, '筆符合的員工');
+    
+    if (filtered.length === 0) {
+        hideAutocomplete();
+        return;
+    }
+    
+    // 顯示下拉選單
+    dropdown.innerHTML = '';
+    filtered.forEach(emp => {
+        const item = document.createElement('div');
+        item.className = 'autocomplete-item';
+        item.innerHTML = `
+            <span>${emp.name}</span>
+            <span class="employee-id">${emp.id}</span>
+        `;
+        item.addEventListener('click', () => selectEmployee(emp));
+        dropdown.appendChild(item);
+    });
+    
+    dropdown.classList.add('active');
+    console.log('✅ 顯示自動完成下拉選單');
+}
 
-    const formData = {
-        action: 'submitLeave',
-        emp_id: empId,
-        emp_name: empName,
-        start_date: startDate,
-        end_date: endDate,
-        days: parseFloat(document.getElementById('days').value) || 0,
-        hours: parseFloat(document.getElementById('hours').value) || 0,
-        leave_type: document.getElementById('leave_type').value,
-        reason: document.getElementById('reason').value,
-        affected_cases: document.getElementById('affected_cases').value,
-        handover_status: document.getElementById('handover_status').value,
-        notes: document.getElementById('notes').value
-    };
+function selectEmployee(employee) {
+    console.log('✅ 選擇員工:', employee);
+    document.getElementById('employeeName').value = employee.name;
+    document.getElementById('employeeId').value = employee.id;
+    hideAutocomplete();
+}
 
+function hideAutocomplete() {
+    const dropdown = document.getElementById('autocompleteDropdown');
+    dropdown.classList.remove('active');
+}
+
+// ==================== 表單送出 ====================
+async function handleFormSubmit(e) {
+    e.preventDefault();
+    
+    const submitBtn = e.target.querySelector('.btn-primary');
+    const originalText = submitBtn.innerHTML;
+    
+    // 禁用按鈕
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="rotating">
+            <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+        </svg>
+        送出中...
+    `;
+    
     try {
-        const response = await fetch(APPS_SCRIPT_URL, {
+        // 收集表單資料
+        const formData = collectFormData();
+        
+        // 驗證資料
+        if (!validateFormData(formData)) {
+            throw new Error('請填寫所有必填欄位');
+        }
+        
+        console.log('📤 送出資料:', formData);
+        
+        // 送出到後端
+        const response = await fetch(SCRIPT_URL, {
             method: 'POST',
+            mode: 'no-cors',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(formData)
         });
-
-        const result = await response.json();
-
-        if (result.success) {
-            alert(`✅ 請假申請已提交成功！\n\n請假單編號：${result.leave_id}\n\n管理者已收到 LINE 通知。`);
-            this.reset();
-            document.getElementById('emp_id').value = '';
-        } else {
-            alert(`❌ 提交失敗：${result.message}`);
-        }
+        
+        // 顯示成功訊息
+        showMessage('請假單已成功送出！', 'success');
+        
+        // 重置表單
+        setTimeout(() => {
+            resetForm();
+        }, 2000);
+        
     } catch (error) {
-        console.error('提交錯誤：', error);
-        alert('❌ 提交失敗，請稍後再試或聯繫管理者');
+        console.error('❌ 送出失敗:', error);
+        showMessage(error.message || '送出失敗，請稍後再試', 'error');
     } finally {
-        document.getElementById('loadingOverlay').classList.remove('active');
+        // 恢復按鈕
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
     }
-});
+}
+
+// ==================== 收集表單資料 ====================
+function collectFormData() {
+    const data = {
+        employeeId: document.getElementById('employeeId').value.trim(),
+        employeeName: document.getElementById('employeeName').value.trim(),
+        leaveType: document.getElementById('leaveType').value,
+        reason: document.getElementById('reason').value.trim(),
+        affectedCases: document.getElementById('affectedCases').value.trim() || '無',
+        handoverComplete: document.getElementById('handoverComplete').value,
+        remarks: document.getElementById('remarks').value.trim() || '無',
+        days: parseFloat(document.getElementById('manualDays').value) || 0,
+        hours: parseFloat(document.getElementById('manualHours').value) || 0,
+        timeMode: currentMode
+    };
+    
+    // 根據模式添加日期時間資料
+    if (currentMode === 'continuous') {
+        const startDate = document.getElementById('startDate').value;
+        const startTime = document.getElementById('startTime').value;
+        const endDate = document.getElementById('endDate').value;
+        const endTime = document.getElementById('endTime').value;
+        
+        data.startDate = `${startDate} ${startTime}`;
+        data.endDate = `${endDate} ${endTime}`;
+    } else {
+        const singleDate = document.getElementById('singleDate').value;
+        const startTime = document.getElementById('singleStartTime').value;
+        const endTime = document.getElementById('singleEndTime').value;
+        
+        data.startDate = `${singleDate} ${startTime}`;
+        data.endDate = `${singleDate} ${endTime}`;
+    }
+    
+    return data;
+}
+
+// ==================== 驗證表單資料 ====================
+function validateFormData(data) {
+    // 必填欄位檢查
+    const required = ['employeeId', 'employeeName', 'leaveType', 'reason', 'handoverComplete'];
+    
+    for (const field of required) {
+        if (!data[field]) {
+            showMessage(`請填寫：${getFieldName(field)}`, 'error');
+            return false;
+        }
+    }
+    
+    // 天數與時數檢查
+    if (data.days <= 0 || data.hours <= 0) {
+        showMessage('請填寫天數與時數', 'error');
+        return false;
+    }
+    
+    return true;
+}
+
+function getFieldName(field) {
+    const names = {
+        employeeId: '員工編號',
+        employeeName: '員工姓名',
+        leaveType: '請假類別',
+        reason: '請假事由',
+        handoverComplete: '交接狀態'
+    };
+    return names[field] || field;
+}
+
+// ==================== 重置表單 ====================
+function resetForm() {
+    document.getElementById('leaveForm').reset();
+    
+    // 重置日期
+    initializeDates();
+    
+    // 重置模式
+    switchMode('continuous');
+    
+    // 重置計數器
+    document.getElementById('reasonCount').textContent = '0';
+    document.getElementById('affectedCount').textContent = '0';
+    document.getElementById('remarksCount').textContent = '0';
+    
+    // 清空員工編號
+    document.getElementById('employeeId').value = '';
+    
+    // 清空天數時數
+    document.getElementById('manualDays').value = '';
+    document.getElementById('manualHours').value = '';
+    
+    // 隱藏訊息
+    hideMessage();
+}
+
+// ==================== 顯示訊息 ====================
+function showMessage(message, type) {
+    const messageElement = document.getElementById('statusMessage');
+    messageElement.textContent = message;
+    messageElement.className = `status-message ${type} show`;
+    
+    // 5 秒後自動隱藏
+    setTimeout(() => {
+        hideMessage();
+    }, 5000);
+}
+
+function hideMessage() {
+    const messageElement = document.getElementById('statusMessage');
+    messageElement.classList.remove('show');
+}
+
+// ==================== 旋轉動畫 ====================
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes rotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    .rotating {
+        animation: rotate 1s linear infinite;
+    }
+`;
+document.head.appendChild(style);
+
+// ==================== 全域函式（供 HTML 呼叫）====================
+window.resetForm = resetForm;
