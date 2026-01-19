@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>秝豐居家長照 - 居服員請假申請</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        
+        .form-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .section-title {
+            border-left: 4px solid #1e40af;
+            padding-left: 12px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            color: #1e3a8a;
+        }
+        
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .loading.active {
+            display: flex;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #1e40af;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        select, input, textarea {
+            font-size: 16px; /* 防止 iOS Safari 自動縮放 */
+        }
+        
+        /* 自動完成下拉選單樣式 */
+        .autocomplete-container {
+            position: relative;
+        }
+        
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #d1d5db;
+            border-top: none;
+            border-radius: 0 0 0.5rem 0.5rem;
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+        
+        .autocomplete-list.active {
+            display: block;
+        }
+        
+        .autocomplete-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #f3f4f6;
+            transition: background-color 0.15s;
+        }
+        
+        .autocomplete-item:hover {
+            background-color: #eff6ff;
+        }
+        
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+        
+        .autocomplete-item-main {
+            font-weight: 500;
+            color: #1f2937;
+        }
+        
+        .autocomplete-item-sub {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+        
+        .autocomplete-no-result {
+            padding: 12px 16px;
+            color: #9ca3af;
+            text-align: center;
+        }
+        
+        .employee-display {
+            display: none;
+            margin-top: 8px;
+            padding: 12px;
+            background-color: #dbeafe;
+            border-radius: 0.5rem;
+            border: 1px solid #3b82f6;
+        }
+        
+        .employee-display.active {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .employee-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .employee-badge {
+            background-color: #3b82f6;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        
+        .employee-name {
+            font-weight: 600;
+            color: #1e40af;
+        }
+        
+        .clear-employee {
+            background-color: white;
+            color: #3b82f6;
+            padding: 4px 12px;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            border: 1px solid #3b82f6;
+            transition: all 0.15s;
+        }
+        
+        .clear-employee:hover {
+            background-color: #3b82f6;
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Loading 動畫 -->
+    <div id="loading" class="loading">
+        <div class="bg-white p-6 rounded-lg shadow-lg text-center">
+            <div class="spinner mx-auto mb-4"></div>
+            <p class="text-gray-700">正在送出請假申請...</p>
+        </div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="min-h-screen py-8 px-4">
+        <div class="form-container">
+            <!-- 標題區 -->
+            <div class="bg-blue-900 text-white p-6 rounded-t-lg shadow-lg">
+                <h1 class="text-2xl md:text-3xl font-bold text-center">秝豐居家長照機構</h1>
+                <p class="text-center mt-2 text-blue-200">居服員請假申請表單</p>
+            </div>
+
+            <!-- 表單區 -->
+            <div class="bg-white p-6 md:p-8 rounded-b-lg shadow-lg">
+                <form id="leaveForm">
+                    
+                    <!-- 員工資料 -->
+                    <div class="mb-8">
+                        <h2 class="section-title text-lg">👤 員工資料</h2>
+                        <div class="mb-4 autocomplete-container">
+                            <label for="employeeName" class="block text-gray-700 font-medium mb-2">
+                                請輸入您的姓名 <span class="text-red-500">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                id="employeeName" 
+                                name="employeeName"
+                                autocomplete="off"
+                                placeholder="開始輸入姓名，例如：王小明"
+                                required
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            
+                            <!-- 自動完成下拉選單 -->
+                            <div id="autocompleteList" class="autocomplete-list"></div>
+                            
+                            <!-- 隱藏欄位：儲存員工編號 -->
+                            <input type="hidden" id="employeeId" name="employeeId">
+                            
+                            <!-- 已選擇的員工顯示 -->
+                            <div id="employeeDisplay" class="employee-display">
+                                <div class="employee-info">
+                                    <span class="employee-badge" id="displayEmpId"></span>
+                                    <span class="employee-name" id="displayEmpName"></span>
+                                </div>
+                                <button type="button" class="clear-employee" onclick="clearEmployee()">
+                                    重新選擇
+                                </button>
+                            </div>
+                            
+                            <p class="text-sm text-gray-500 mt-1">💡 輸入姓名會自動顯示符合的員工，選擇後會自動帶入編號</p>
+                        </div>
+                    </div>
+
+                    <!-- 請假時間 -->
+                    <div class="mb-8">
+                        <h2 class="section-title text-lg">📅 請假時間</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label for="startDate" class="block text-gray-700 font-medium mb-2">
+                                    請假日期（起） <span class="text-red-500">*</span>
+                                </label>
+                                <input 
+                                    type="date" 
+                                    id="startDate" 
+                                    name="startDate" 
+                                    required
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label for="endDate" class="block text-gray-700 font-medium mb-2">
+                                    請假日期（迄） <span class="text-red-500">*</span>
+                                </label>
+                                <input 
+                                    type="date" 
+                                    id="endDate" 
+                                    name="endDate" 
+                                    required
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        <p class="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
+                            ⚠️ 如需請多個不連續日期，請分別填寫多筆申請
+                        </p>
+                    </div>
+
+                    <!-- 請假時數 -->
+                    <div class="mb-8">
+                        <h2 class="section-title text-lg">⏱️ 請假時數</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="days" class="block text-gray-700 font-medium mb-2">
+                                    天數 <span class="text-red-500">*</span>
+                                </label>
+                                <input 
+                                    type="number" 
+                                    id="days" 
+                                    name="days" 
+                                    min="0" 
+                                    step="0.5"
+                                    required
+                                    placeholder="例如：3"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label for="hours" class="block text-gray-700 font-medium mb-2">
+                                    時數 <span class="text-red-500">*</span>
+                                </label>
+                                <input 
+                                    type="number" 
+                                    id="hours" 
+                                    name="hours" 
+                                    min="0" 
+                                    step="0.5"
+                                    required
+                                    placeholder="例如：24"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 請假資訊 -->
+                    <div class="mb-8">
+                        <h2 class="section-title text-lg">📝 請假資訊</h2>
+                        <div class="mb-4">
+                            <label for="leaveType" class="block text-gray-700 font-medium mb-2">
+                                請假類別 <span class="text-red-500">*</span>
+                            </label>
+                            <select 
+                                id="leaveType" 
+                                name="leaveType" 
+                                required
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="">請選擇請假類別...</option>
+                                <option value="事假">事假</option>
+                                <option value="病假">病假</option>
+                                <option value="喪假">喪假</option>
+                                <option value="婚假">婚假</option>
+                                <option value="特休">特休</option>
+                                <option value="公假">公假</option>
+                                <option value="產假">產假</option>
+                                <option value="陪產假">陪產假</option>
+                            </select>
+                        </div>
+                        <div class="mb-4">
+                            <label for="reason" class="block text-gray-700 font-medium mb-2">
+                                請假事由 <span class="text-red-500">*</span>
+                            </label>
+                            <textarea 
+                                id="reason" 
+                                name="reason" 
+                                rows="3" 
+                                required
+                                placeholder="請簡述請假原因..."
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 影響個案 -->
+                    <div class="mb-8">
+                        <h2 class="section-title text-lg">🏠 影響個案</h2>
+                        <div class="mb-4">
+                            <label for="affectedCases" class="block text-gray-700 font-medium mb-2">
+                                影響個案
+                            </label>
+                            <textarea 
+                                id="affectedCases" 
+                                name="affectedCases" 
+                                rows="2" 
+                                placeholder="例如：陳OO(大安區)、李OO(松山區)。無則填「無」"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 交接確認 -->
+                    <div class="mb-8">
+                        <h2 class="section-title text-lg">✅ 交接確認</h2>
+                        <div class="mb-4">
+                            <label class="block text-gray-700 font-medium mb-3">
+                                欲請假者請完成請假交接事項於群組，是否已完成交接？ <span class="text-red-500">*</span>
+                            </label>
+                            <div class="space-y-2">
+                                <label class="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-blue-50">
+                                    <input 
+                                        type="radio" 
+                                        name="handoverStatus" 
+                                        value="已完成" 
+                                        required
+                                        class="w-5 h-5 text-blue-600">
+                                    <span class="ml-3 text-gray-700">✅ 已完成交接</span>
+                                </label>
+                                <label class="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-blue-50">
+                                    <input 
+                                        type="radio" 
+                                        name="handoverStatus" 
+                                        value="未完成" 
+                                        required
+                                        class="w-5 h-5 text-blue-600">
+                                    <span class="ml-3 text-gray-700">⏳ 未完成交接</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 備註 -->
+                    <div class="mb-8">
+                        <h2 class="section-title text-lg">💬 備註（交班提醒事項）</h2>
+                        <div class="mb-4">
+                            <textarea 
+                                id="notes" 
+                                name="notes" 
+                                rows="3" 
+                                placeholder="例如：陳OO需提醒下午3點吃藥、李OO當天有復健行程"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 送出按鈕 -->
+                    <div class="border-t pt-6">
+                        <button 
+                            type="submit" 
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg transition duration-200 shadow-lg text-lg">
+                            📤 送出請假申請
+                        </button>
+                        <p class="text-sm text-gray-500 text-center mt-3">
+                            送出後將自動通知管理者，請假單編號將顯示於確認頁面
+                        </p>
+                    </div>
+
+                </form>
+            </div>
+
+            <!-- 頁尾 -->
+            <div class="text-center mt-6 text-gray-500 text-sm">
+                <p>© 2026 秝豐居家長照機構 - 請假管理系統</p>
+                <p class="mt-1">如有問題請聯繫機構主管</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 成功訊息 Modal -->
+    <div id="successModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl max-w-md w-full p-6 transform transition-all">
+            <div class="text-center">
+                <div class="mb-4">
+                    <svg class="w-16 h-16 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-2">請假申請成功！</h3>
+                <p class="text-gray-600 mb-4">您的請假單編號：</p>
+                <p id="leaveIdDisplay" class="text-2xl font-mono font-bold text-blue-600 bg-blue-50 py-3 px-4 rounded-lg mb-4"></p>
+                <p class="text-sm text-gray-500 mb-6">管理者已收到通知，請保留此編號以供查詢</p>
+                <button 
+                    onclick="closeSuccessModal()" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200">
+                    確定
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
