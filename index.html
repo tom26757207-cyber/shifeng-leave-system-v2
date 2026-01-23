@@ -13,8 +13,8 @@
         }
 
         :root {
-            --primary-color: #596b92;
-            --primary-hover: #749ad3;
+            --primary-color: #5973ac;
+            --primary-hover: #5973ac;
             --secondary-color: #6B7280;
             --success-color: #10B981;
             --error-color: #EF4444;
@@ -56,7 +56,7 @@
             align-items: center;
             padding: 24px 32px;
             border-bottom: 1px solid var(--border-color);
-            background: linear-gradient(135deg, #738ec0 0%, #537aad 100%);
+            background: linear-gradient(135deg, #5973ac 0%, #5973ac 100%);
             color: white;
         }
 
@@ -273,7 +273,7 @@
         /* 計算結果顯示 */
         .calculation-result {
             background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
-            border: 2px solid #3B82F6;
+            border: 2px solid #5973ac;
             border-radius: 8px;
             padding: 16px;
             margin-top: 16px;
@@ -286,14 +286,14 @@
 
         .calculation-title {
             font-weight: 600;
-            color: #1E40AF;
+            color: #5973ac;
             margin-bottom: 8px;
             font-size: 14px;
         }
 
         .calculation-detail {
             font-size: 13px;
-            color: #4f5c80;
+            color: #5973ac;
             line-height: 1.6;
         }
 
@@ -620,6 +620,14 @@
                                 <div class="calculation-detail" id="calculationDetail"></div>
                             </div>
 
+
+                            <!-- 重新計算（避免未選時間就先算） -->
+                            <div style="display:flex; justify-content:flex-end; margin-top: 10px;">
+                                <button type="button" class="btn btn-secondary" id="recalcBtn" style="padding:10px 14px; font-size:13px;">
+                                    🔄 重新計算
+                                </button>
+                            </div>
+
                             <!-- 手動輸入天數時數 -->
                             <div class="manual-input-section">
                                 <div class="form-grid">
@@ -726,7 +734,7 @@
 
     <script>
         // ==================== 配置 ====================
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwyu9FF-SxsRjjZhJhFkPDZu1Y8oEWEInHgsZcbaj5bdx7rlNWmiddom1ktvO4lvIujNQ/exec'; // 請替換為你的 Apps Script 部署網址
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzb6App99F4aeSwPApP8S32ajWGwNqgDF_WL9kWqF6H6jIELcFtY2R-Bzk7ylyylUZFVw/exec'; // 請替換為你的 Apps Script 部署網址
         
         // ==================== 全域變數 ====================
         let employeeList = [];
@@ -887,10 +895,10 @@
             });
             
             // 日期變更時自動計算
-            document.getElementById('startDate').addEventListener('change', calculateLeaveDays);
-            document.getElementById('endDate').addEventListener('change', calculateLeaveDays);
-            document.getElementById('startTime').addEventListener('change', calculateLeaveDays);
-            document.getElementById('endTime').addEventListener('change', calculateLeaveDays);
+            document.getElementById('startDate').addEventListener('change', markCalcDirty_);
+            document.getElementById('endDate').addEventListener('change', markCalcDirty_);
+            document.getElementById('startTime').addEventListener('change', () => { markCalcDirty_(); calculateLeaveDays(true); });
+            document.getElementById('endTime').addEventListener('change', () => { markCalcDirty_(); calculateLeaveDays(true); });
             document.getElementById('singleDate').addEventListener('change', calculateLeaveDays);
             document.getElementById('singleStartTime').addEventListener('change', calculateLeaveDays);
             document.getElementById('singleEndTime').addEventListener('change', calculateLeaveDays);
@@ -929,19 +937,42 @@
                 handleFiles(e.target.files);
             });
             
+            
+
+            // ===== 計算控制：日期先選不自動算，避免誤判 =====
+            let calcDirty = false;
+            function markCalcDirty_() {
+                calcDirty = true;
+                // 只要日期/時間有變更，就先把結果收起來，等使用者按「重新計算」或改時間再算
+                document.getElementById('calculationResult').classList.remove('show');
+                document.getElementById('calculationDetail').innerHTML = '';
+            }
+
+            // 重新計算按鈕
+            document.getElementById('recalcBtn')?.addEventListener('click', () => {
+                calculateLeaveDays(true);
+            });
+
             // 表單提交
             document.getElementById('leaveForm').addEventListener('submit', handleSubmit);
         }
         
         // ==================== 日期計算 ====================
-        function calculateLeaveDays() {
+        function calculateLeaveDays(force = false) {
             if (currentTimeMode === 'continuous') {
                 const startDate = document.getElementById('startDate').value;
                 const endDate = document.getElementById('endDate').value;
                 const startTime = document.getElementById('startTime').value;
                 const endTime = document.getElementById('endTime').value;
                 
-                if (!startDate || !endDate) return;
+                if (!startDate || !endDate || !startTime || !endTime) {
+                    markCalcDirty_();
+                    return;
+                }
+                // 若只是選日期（尚未按重新計算），不主動算
+                if (!force && calcDirty) {
+                    return;
+                }
                 
                 const result = calculateWorkingDays(startDate, endDate, startTime, endTime);
                 
@@ -949,6 +980,7 @@
                 document.getElementById('manualHours').value = result.hours.toFixed(2);
                 
                 document.getElementById('calculationDetail').innerHTML = result.detail;
+                calcDirty = false;
                 document.getElementById('calculationResult').classList.add('show');
             } else {
                 const singleDate = document.getElementById('singleDate').value;
@@ -963,6 +995,7 @@
                 document.getElementById('manualHours').value = result.hours.toFixed(2);
                 
                 document.getElementById('calculationDetail').innerHTML = result.detail;
+                calcDirty = false;
                 document.getElementById('calculationResult').classList.add('show');
             }
         }
@@ -970,45 +1003,76 @@
         function calculateWorkingDays(startDateStr, endDateStr, startTime, endTime) {
             const start = new Date(startDateStr + 'T' + startTime);
             const end = new Date(endDateStr + 'T' + endTime);
-            
+
             let workingDays = 0;
             let holidayCount = 0;
             let sundayCount = 0;
+            let totalHours = 0;
+
             let current = new Date(start);
             current.setHours(0, 0, 0, 0);
             const endDay = new Date(end);
             endDay.setHours(0, 0, 0, 0);
-            
+
             while (current <= endDay) {
                 const dateStr = current.toISOString().split('T')[0];
                 const dayOfWeek = current.getDay();
-                
-                if (dayOfWeek === 0) {
+
+                // 週末不計（週六、週日）
+                if (dayOfWeek === 0 || dayOfWeek === 6) {
                     sundayCount++;
-                } else if (holidays2026.includes(dateStr)) {
-                    holidayCount++;
-                } else {
-                    workingDays++;
+                    current.setDate(current.getDate() + 1);
+                    continue;
                 }
-                
+
+                // 國定假日不計（2026 清單）
+                if (holidays2026.includes(dateStr)) {
+                    holidayCount++;
+                    current.setDate(current.getDate() + 1);
+                    continue;
+                }
+
+                // 工作日 +1
+                workingDays++;
+
+                // 依「精算時數」規則累計：中間日 09:00-18:00；首日從 startTime；末日到 endTime
+                let dayStart = new Date(current);
+                let dayEnd = new Date(current);
+                dayStart.setHours(9, 0, 0, 0);
+                dayEnd.setHours(18, 0, 0, 0);
+
+                if (dateStr === startDateStr) {
+                    dayStart = new Date(start);
+                }
+                if (dateStr === endDateStr) {
+                    dayEnd = new Date(end);
+                }
+
+                let hours = (dayEnd - dayStart) / (1000 * 60 * 60);
+
+                // 午休扣 1 小時（12:00-13:00）
+                if (dayStart.getHours() < 13 && dayEnd.getHours() >= 13) {
+                    hours -= 1;
+                }
+
+                totalHours += Math.max(0, hours);
+
                 current.setDate(current.getDate() + 1);
             }
-            
-            // 計算實際時數（考慮起訖時間）
-            const totalMs = end - start;
-            const totalHours = totalMs / (1000 * 60 * 60);
-            const actualHours = (workingDays * 8) + ((totalHours % 8) - 8);
-            const finalHours = Math.max(workingDays * 8, actualHours);
-            
+
+            const finalHours = totalHours;
+            const finalDays = finalHours / 8;
+
             let detail = `計算期間：${startDateStr} ${startTime} ~ ${endDateStr} ${endTime}<br>`;
-            detail += `工作日：${workingDays} 天（週一至週六）<br>`;
-            if (sundayCount > 0) detail += `排除週日：${sundayCount} 天<br>`;
+            detail += `工作日：${workingDays} 天（週一至週五）<br>`;
+            if (sundayCount > 0) detail += `排除週末：${sundayCount} 天<br>`;
             if (holidayCount > 0) detail += `排除國定假日：${holidayCount} 天<br>`;
-            detail += `總時數：${finalHours.toFixed(1)} 小時（1天 = 8小時）`;
-            
-            return { days: workingDays, hours: finalHours, detail };
+            detail += `總時數：${finalHours.toFixed(2)} 小時（1天 = 8小時）`;
+            detail += `<br>換算天數：${finalDays.toFixed(2)} 天（1天 = 8小時）`;
+
+            return { days: finalDays, hours: finalHours, detail };
         }
-        
+
         function calculateHours(dateStr, startTimeStr, endTimeStr) {
             const startDateTime = new Date(`${dateStr}T${startTimeStr}:00`);
             const endDateTime = new Date(`${dateStr}T${endTimeStr}:00`);
