@@ -13,8 +13,8 @@
         }
 
         :root {
-            --primary-color: #4783c7;
-            --primary-hover: #487ac5;
+            --primary-color: #596b92;
+            --primary-hover: #749ad3;
             --secondary-color: #6B7280;
             --success-color: #10B981;
             --error-color: #EF4444;
@@ -56,7 +56,7 @@
             align-items: center;
             padding: 24px 32px;
             border-bottom: 1px solid var(--border-color);
-            background: linear-gradient(135deg, #5e71c4 0%, #4b7ba2 100%);
+            background: linear-gradient(135deg, #738ec0 0%, #537aad 100%);
             color: white;
         }
 
@@ -293,7 +293,7 @@
 
         .calculation-detail {
             font-size: 13px;
-            color: #1E3A8A;
+            color: #4f5c80;
             line-height: 1.6;
         }
 
@@ -625,11 +625,11 @@
                                 <div class="form-grid">
                                     <div class="form-group">
                                         <label class="form-label">天數 <span class="required">*</span></label>
-                                        <input type="number" id="manualDays" class="form-input" step="0.5" min="0" placeholder="自動計算（可調整）" required>
+                                        <input type="number" id="manualDays" class="form-input" step="0.01" inputmode="decimal" min="0" placeholder="自動計算（可調整）" required>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">時數 <span class="required">*</span></label>
-                                        <input type="number" id="manualHours" class="form-input" step="0.5" min="0" placeholder="自動計算（可調整）" required>
+                                        <input type="number" id="manualHours" class="form-input" step="0.01" inputmode="decimal" min="0" placeholder="自動計算（可調整）" required>
                                     </div>
                                 </div>
                             </div>
@@ -945,8 +945,8 @@
                 
                 const result = calculateWorkingDays(startDate, endDate, startTime, endTime);
                 
-                document.getElementById('manualDays').value = result.days.toFixed(1);
-                document.getElementById('manualHours').value = result.hours.toFixed(1);
+                document.getElementById('manualDays').value = result.days.toFixed(2);
+                document.getElementById('manualHours').value = result.hours.toFixed(2);
                 
                 document.getElementById('calculationDetail').innerHTML = result.detail;
                 document.getElementById('calculationResult').classList.add('show');
@@ -959,8 +959,8 @@
                 
                 const result = calculateHours(singleDate, startTime, endTime);
                 
-                document.getElementById('manualDays').value = result.days.toFixed(1);
-                document.getElementById('manualHours').value = result.hours.toFixed(1);
+                document.getElementById('manualDays').value = result.days.toFixed(2);
+                document.getElementById('manualHours').value = result.hours.toFixed(2);
                 
                 document.getElementById('calculationDetail').innerHTML = result.detail;
                 document.getElementById('calculationResult').classList.add('show');
@@ -1081,7 +1081,30 @@
             return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
         }
         
-        // ==================== 表單提交 ====================
+        
+
+        // ==================== 小數輸入容錯（天/小時） ====================
+        function normalizeDecimalInput_(el, decimals) {
+            if (!el) return;
+            let v = (el.value || '').toString().trim();
+            if (!v) return;
+            // 支援歐式逗號小數："1,5" -> "1.5"
+            v = v.replace(/,/g, '.');
+            // 只保留數字與一個小數點
+            v = v.replace(/[^0-9.]/g, '');
+            const parts = v.split('.');
+            if (parts.length > 2) {
+                v = parts[0] + '.' + parts.slice(1).join('');
+            }
+            const num = parseFloat(v);
+            if (Number.isNaN(num)) return;
+            el.value = num.toFixed(decimals);
+        }
+
+        // 天/小時：離開輸入框時自動正規化
+        document.getElementById('manualDays')?.addEventListener('blur', () => normalizeDecimalInput_(document.getElementById('manualDays'), 2));
+        document.getElementById('manualHours')?.addEventListener('blur', () => normalizeDecimalInput_(document.getElementById('manualHours'), 2));
+// ==================== 表單提交 ====================
         async function handleSubmit(e) {
             e.preventDefault();
             
