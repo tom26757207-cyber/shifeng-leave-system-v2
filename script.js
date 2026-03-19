@@ -1,5 +1,5 @@
 // ==================== 配置區 ====================
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz4VijMOiZNKOjeZXjrub2ra5tx3TbrTko4HBUm-Ln3GjmTX70dfdTNem11pya54ZuEsQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz_fvHyvFnZomI-DyIcidP0N9NXpAmR6hpYD7sYBYnZIO9MmvSk8Akhs57AyZP4ftMRdg/exec';
 
 // ==================== 全域變數 ====================
 let employeeData = []; // 員工資料
